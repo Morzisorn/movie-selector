@@ -10,10 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	tg_api_key = "7136163095:AAGa1GB9JuEgYCY4EITA7Uy4ueysW7SnXV4"
-)
-
 func handleTgUpdates(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	if update.Message != nil { // Проверяем, есть ли сообщение
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
@@ -44,13 +40,13 @@ func handleTgUpdates(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 			logrus.Println("Error making request to server:", err)
 			msg.Text = "Error contacting the server"
 		}
-		msg.Text = string(body)[:100]
+		msg.Text = string(body)
 		bot.Send(msg)
 	}
 }
 
 func StartBot() {
-	bot, err := tgbotapi.NewBotAPI(tg_api_key)
+	bot, err := tgbotapi.NewBotAPI(Tg_api_key)
 	if err != nil {
 		logrus.Panic(err)
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,8 +13,7 @@ import (
 )
 
 var (
-	tmdb_api_key = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJjODdlMDEwNjE5N2EyMGU1NTgyNjRlNWI4MWYwYjJkOCIsIm5iZiI6MTcyNjMzMzIzMy43NDM0MzMsInN1YiI6IjY2ZTU5ZDI4NjRkYmIzYmUxODJlNTI4MyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.hKmbpY0JgG8FVbV6VdekvVkhsA8q3FbxUd-zXuhxnQA"
-	baseURL      = "https://api.themoviedb.org/3"
+	baseURL = "https://api.themoviedb.org/3"
 )
 
 type (
@@ -52,19 +52,19 @@ func getTMDBMovies(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).SendString("No query in params")
 	}
 
-	//var tmdbMovies GetTMBDMoviesResponse
 	tmdbMoviesResponse, err := SearchMovie(query)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString(fmt.Sprintf("Use SearchMovie error: %w", err))
 	}
-	/*
-		err := json.Unmarshal([]byte(tmdbMoviesResponse), tmdbMovies)
-		if err != nil {
-			return c.SendStatus(fiber.StatusBadRequest)
-		}
-	*/
+	var tmdbMovies GetTMBDMoviesResponse
+
+	err = json.Unmarshal([]byte(tmdbMoviesResponse), &tmdbMovies)
+	if err != nil {
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+
 	fmt.Println("Finish getTMDBMovies")
-	return c.JSON(tmdbMoviesResponse)
+	return c.JSON(tmdbMovies.Movies[0].Release_date)
 }
 
 func SearchMovie(query string) (string, error) {
@@ -76,7 +76,7 @@ func SearchMovie(query string) (string, error) {
 		return "", fmt.Errorf("create get request to tmdb: %w", err)
 	}
 
-	req.Header.Add("Authorization", "Bearer "+tmdb_api_key)
+	req.Header.Add("Authorization", "Bearer "+Tmdb_api_key)
 	req.Header.Add("accept", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
