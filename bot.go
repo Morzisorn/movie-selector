@@ -1,6 +1,8 @@
 package main
 
 import (
+	//"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,9 +13,10 @@ import (
 )
 
 func handleTgUpdates(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
-	if update.Message != nil { // Проверяем, есть ли сообщение
+	if update.Message != nil { // Check new messages
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-		// Здесь вы можете обработать текст сообщения и отправить запрос к вашему серверу
+
+		// Create full url with query params
 		host := "http://localhost:3000"
 		path := "/search/movie"
 		params := url.Values{}
@@ -27,8 +30,8 @@ func handleTgUpdates(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 		baseURL.Path += path
 		baseURL.RawQuery = params.Encode()
 
-		fmt.Printf("baseURL: %s\n", baseURL.String())
-		response, err := http.Get(baseURL.String()) // Пример запроса к вашему серверу
+		// Make request to Server
+		response, err := http.Get(baseURL.String())
 		if err != nil {
 			logrus.Println("Error making request to server:", err)
 			msg.Text = "Error contacting the server"
@@ -36,11 +39,24 @@ func handleTgUpdates(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 		defer response.Body.Close()
 
 		body, err := io.ReadAll(response.Body)
+
 		if err != nil {
-			logrus.Println("Error making request to server:", err)
+			fmt.Println("ReadAll error:", err)
 			msg.Text = "Error contacting the server"
 		}
-		msg.Text = string(body)
+
+		var movie Movie
+		if err = json.Unmarshal(body, &movie); err != nil {
+			logrus.Println("Error making request to server:", err)
+			fmt.Printf("Error contacting the server: Unmarshal %s", err)
+		}
+
+		msg.Text = fmt.Sprintf(`Original title: %s
+Release date: %s
+Overview: %s`,
+			movie.Original_title, movie.Release_date, movie.Overview)
+
+		//fmt.Println(msg.Text)
 		bot.Send(msg)
 	}
 }

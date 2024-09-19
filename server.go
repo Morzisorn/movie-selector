@@ -26,29 +26,20 @@ type (
 	}
 
 	Movie struct {
-		ID                int64   `json:"id"`
-		Original_title    string  `json:"original_title"`
-		Genre_ids         []int64 `json:"genre_ids"`
-		Original_language string  `json:"original_language"`
-		Overview          string  `json:"overview"`
-		Release_date      string  `json:"release_date"`
-		Vote_average      float64 `json:"vote_average"`
+		ID                int64   `json:"id,omitempty"`
+		Original_title    string  `json:"original_title,omitempty"`
+		Genre_ids         []int64 `json:"genre_ids,omitempty"`
+		Original_language string  `json:"original_language,omitempty"`
+		Overview          string  `json:"overview,omitempty"`
+		Release_date      string  `json:"release_date,omitempty"`
+		Vote_average      float64 `json:"vote_average,omitempty"`
 	}
 )
 
 func getTMDBMovies(c *fiber.Ctx) error {
-	/*
-		var resp GetTgMoviesRequest
-		if err := c.BodyParser(&resp); err != nil {
-			return c.SendStatus(fiber.StatusBadRequest)
-		}
-	*/
-	fmt.Println("Enter getTMDBMovies")
-	query := c.Params("query")
+	query := c.Query("query")
 	if query == "" {
 		fmt.Println("No query in params")
-		fmt.Println(c.Request())
-		fmt.Println(c.AllParams())
 		return c.Status(fiber.StatusBadRequest).SendString("No query in params")
 	}
 
@@ -63,12 +54,19 @@ func getTMDBMovies(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
 
-	fmt.Println("Finish getTMDBMovies")
-	return c.JSON(tmdbMovies.Movies[0].Release_date)
+	resp := Movie{
+		Original_title: tmdbMovies.Movies[0].Original_title,
+		Release_date:   tmdbMovies.Movies[0].Release_date,
+		Overview:       tmdbMovies.Movies[0].Overview,
+	}
+
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString(fmt.Sprintf("Response marshal error: %w", err))
+	}
+	return c.JSON(resp)
 }
 
 func SearchMovie(query string) (string, error) {
-	fmt.Println("Enter Search Movie")
 	url := baseURL + "/search/movie" + "?query=" + query
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -87,7 +85,6 @@ func SearchMovie(query string) (string, error) {
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 
-	fmt.Println("Finish Search Movie")
 	return string(body), nil
 
 }
