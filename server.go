@@ -45,7 +45,7 @@ func getTMDBMovies(c *fiber.Ctx) error {
 
 	tmdbMoviesResponse, err := SearchMovie(query)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString(fmt.Sprintf("Use SearchMovie error: %w", err))
+		return c.Status(fiber.StatusBadRequest).SendString(fmt.Sprintf("Use SearchMovie error: %v", err))
 	}
 	var tmdbMovies GetTMBDMoviesResponse
 
@@ -60,9 +60,6 @@ func getTMDBMovies(c *fiber.Ctx) error {
 		Overview:       tmdbMovies.Movies[0].Overview,
 	}
 
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString(fmt.Sprintf("Response marshal error: %w", err))
-	}
 	return c.JSON(resp)
 }
 
