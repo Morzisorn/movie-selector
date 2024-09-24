@@ -13,10 +13,20 @@ import (
 )
 
 var (
-	baseURL = "https://api.themoviedb.org/3"
+	tmdbBaseURL = "https://api.themoviedb.org/3"
 )
 
 type (
+	TMDBClient struct{}
+
+	MovieSearcher interface {
+		SearchMovie(query string) (string, error)
+	}
+
+	PersonSearcher interface {
+		SearchPerson(query string) (string, error)
+	}
+
 	GetTgMoviesRequest struct {
 		MoviesRequest string
 	}
@@ -25,25 +35,45 @@ type (
 		Movies []Movie `json:"results"`
 	}
 
-	Movie struct {
-		ID                int64   `json:"id,omitempty"`
-		Original_title    string  `json:"original_title,omitempty"`
-		Genre_ids         []int64 `json:"genre_ids,omitempty"`
-		Original_language string  `json:"original_language,omitempty"`
-		Overview          string  `json:"overview,omitempty"`
-		Release_date      string  `json:"release_date,omitempty"`
-		Vote_average      float64 `json:"vote_average,omitempty"`
+	GetTgPersonsRequest struct {
+		PersonRequest string
+	}
+
+	GetTMBDPersonResponse struct {
+		Persons []Person `json:"results"`
 	}
 )
 
-func getTMDBMovies(c *fiber.Ctx) error {
+func StartServer() {
+	app := fiber.New(fiber.Config{
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 3 * time.Second,
+	})
+
+	app.Use(recover.New())
+
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.SendString("Hello, Fiber!")
+	})
+
+	app.Get("/search/movie", func(c *fiber.Ctx) error {
+		return getTMDBMovies(c, TMDBClient{})
+	})
+	app.Get("/search/person", func(c *fiber.Ctx) error {
+		return getTMDBPerson(c, TMDBClient{})
+	})
+
+	logrus.Fatal(app.Listen(":3000"))
+}
+
+func getTMDBMovies(c *fiber.Ctx, s MovieSearcher) error {
 	query := c.Query("query")
 	if query == "" {
 		fmt.Println("No query in params")
 		return c.Status(fiber.StatusBadRequest).SendString("No query in params")
 	}
 
-	tmdbMoviesResponse, err := SearchMovie(query)
+	tmdbMoviesResponse, err := s.SearchMovie(query)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString(fmt.Sprintf("Use SearchMovie error: %v", err))
 	}
@@ -63,12 +93,64 @@ func getTMDBMovies(c *fiber.Ctx) error {
 	return c.JSON(resp)
 }
 
-func SearchMovie(query string) (string, error) {
-	url := baseURL + "/search/movie" + "?query=" + query
+func getTMDBPerson(c *fiber.Ctx, s PersonSearcher) error {
+	query := c.Query("query")
+	if query == "" {
+		fmt.Println("No query in params")
+		return c.Status(fiber.StatusBadRequest).SendString("No query in params")
+	}
 
-	req, err := http.NewRequest("GET", url, nil)
+	tmdbPersonResponse, err := s.SearchPerson(query)
 	if err != nil {
-		return "", fmt.Errorf("create get request to tmdb: %w", err)
+		return c.Status(fiber.StatusBadRequest).SendString(fmt.Sprintf("Use SearchPerson error: %v", err))
+	}
+	var tmdbPersons GetTMBDPersonResponse
+
+	err = json.Unmarshal([]byte(tmdbPersonResponse), &tmdbPersons)
+	if err != nil {
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+
+	resp := Person{
+		Name:               tmdbPersons.Persons[0].Name,
+		KnownForDepartment: tmdbPersons.Persons[0].KnownForDepartment,
+		KnownFor:           tmdbPersons.Persons[0].KnownFor,
+	}
+
+	return c.JSON(resp)
+}
+
+func (t TMDBClient) SearchMovie(query string) (string, error) {
+	path := "/search/movie"
+
+	body, err := makeTMDBRequest(path, query)
+	if err != nil {
+		return "", err
+	}
+
+	return body, nil
+}
+
+func (t TMDBClient) SearchPerson(query string) (string, error) {
+	path := "/search/person"
+
+	body, err := makeTMDBRequest(path, query)
+	if err != nil {
+		return "", err
+	}
+
+	return body, nil
+}
+
+func makeTMDBRequest(path, query string) (string, error) {
+	url, err := createURL(tmdbBaseURL, path, query)
+	if err != nil {
+		return "", fmt.Errorf("create url error: %v", err)
+	}
+
+	req, err := http.NewRequest("GET", url.String(), nil)
+	if err != nil {
+		return "", fmt.Errorf("create get request to tmdb: %v", err)
 	}
 
 	req.Header.Add("Authorization", "Bearer "+Tmdb_api_key)
@@ -81,24 +163,5 @@ func SearchMovie(query string) (string, error) {
 
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
-
 	return string(body), nil
-
-}
-
-func StartServer() {
-	app := fiber.New(fiber.Config{
-		ReadTimeout:  3 * time.Second,
-		WriteTimeout: 3 * time.Second,
-	})
-
-	app.Use(recover.New())
-
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.SendString("Hello, Fiber!")
-	})
-
-	app.Get("/search/movie", getTMDBMovies)
-
-	logrus.Fatal(app.Listen(":3000"))
 }
