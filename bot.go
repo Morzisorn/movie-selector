@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,11 +14,22 @@ import (
 var (
 	serverHost        = "http://localhost:3000"
 	currentUserAction string
+	skipQuery         = "SkipQuery"
 )
 
 var (
-	searchMovie  = "Search Movie"
-	searchPerson = "Search Person"
+	searchButton       = "Search"
+	searchMovieButton  = "Search Movie"
+	searchTVButton     = "Search Series"
+	searchPersonButton = "Search Person"
+	cancelButton       = "Cancel"
+
+	movieListsButton  = "Movie lists"
+	movieListPopular  = "Popular"
+	movieListTopRated = "Top rated"
+	//movieListUpcoming = "Upcoming"
+	tvListsButton     = "TV lists"
+	personListsButton = "Person lists"
 )
 
 func StartBot() {
@@ -52,26 +62,52 @@ func handleTgUpdates(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	}
 }
 
+func createKeyboard(buttons ...string) tgbotapi.ReplyKeyboardMarkup {
+	var keyboard []tgbotapi.KeyboardButton
+	for _, button := range buttons {
+		keyboard = append(keyboard, tgbotapi.NewKeyboardButton(button))
+	}
+
+	return tgbotapi.NewReplyKeyboard(keyboard)
+}
+
 func handleUserAction(update tgbotapi.Update) (tgbotapi.MessageConfig, error) {
 	var msg tgbotapi.MessageConfig
 	switch {
-	case update.Message.Text == "/start": //Start app
-		buttonSearchMovie := tgbotapi.NewKeyboardButton(searchMovie)
-		buttonSearchActor := tgbotapi.NewKeyboardButton(searchPerson)
-		keyboard := tgbotapi.NewReplyKeyboard(
-			tgbotapi.NewKeyboardButtonRow(buttonSearchMovie, buttonSearchActor),
-		)
-
+	//Start app
+	case update.Message.Text == "/start":
 		msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Hi! Choose action")
-		msg.ReplyMarkup = keyboard
+		msg.ReplyMarkup = createKeyboard(searchButton, movieListsButton, tvListsButton, personListsButton)
 		return msg, nil
-	case update.Message.Text == searchMovie: //Start of search movie flow
-		currentUserAction = searchMovie
+	//Cancel action
+	case update.Message.Text == cancelButton:
+		msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Choose action")
+		msg.ReplyMarkup = createKeyboard(searchButton, movieListsButton, tvListsButton, personListsButton)
+		return msg, nil
+	//Search options
+	case update.Message.Text == searchButton:
+		msg = tgbotapi.NewMessage(update.Message.Chat.ID, "What do you search?")
+		msg.ReplyMarkup = createKeyboard(searchMovieButton, searchTVButton, searchPersonButton, cancelButton)
+		return msg, nil
+	//Movie lists options
+	case update.Message.Text == movieListsButton:
+		msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Choose a movie list")
+		msg.ReplyMarkup = createKeyboard(movieListPopular, cancelButton)
+		return msg, nil
+	//Start of search movie flow
+	case update.Message.Text == searchMovieButton:
+		currentUserAction = searchMovieButton
 		return tgbotapi.NewMessage(update.Message.Chat.ID, "Enter movie title"), nil
-	case update.Message.Text == searchPerson: //Start of search person flow
-		currentUserAction = searchPerson
+	//Start of search TV flow
+	case update.Message.Text == searchTVButton:
+		currentUserAction = searchTVButton
+		return tgbotapi.NewMessage(update.Message.Chat.ID, "Enter series title"), nil
+	//Start of search person flow
+	case update.Message.Text == searchPersonButton:
+		currentUserAction = searchPersonButton
 		return tgbotapi.NewMessage(update.Message.Chat.ID, "Enter person's name"), nil
-	case currentUserAction == searchMovie: //Search movie by title
+	//Search movie by title
+	case currentUserAction == searchMovieButton:
 		msg = tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 
 		err := actionSearchMovie(update, &msg)
@@ -79,11 +115,39 @@ func handleUserAction(update tgbotapi.Update) (tgbotapi.MessageConfig, error) {
 			return tgbotapi.MessageConfig{}, fmt.Errorf("search movie error: %v", err)
 		}
 		return msg, nil
-	case currentUserAction == searchPerson: //Search person by name
+	//Search TV by title
+	case currentUserAction == searchTVButton:
+		msg = tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
+
+		err := actionSearchTV(update, &msg)
+		if err != nil {
+			return tgbotapi.MessageConfig{}, fmt.Errorf("search TV error: %v", err)
+		}
+		return msg, nil
+	//Search person by name
+	case currentUserAction == searchPersonButton:
 		msg = tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 		err := actionSearchPerson(update, &msg)
 		if err != nil {
 			return tgbotapi.MessageConfig{}, fmt.Errorf("search person error: %v", err)
+		}
+		return msg, nil
+	//Popular movie list
+	case update.Message.Text == movieListPopular:
+		msg = tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
+		msg.ReplyMarkup = createKeyboard(movieListPopular, cancelButton)
+		err := actionPopularMovieList(&msg)
+		if err != nil {
+			return tgbotapi.MessageConfig{}, fmt.Errorf("popular movie list error: %v", err)
+		}
+		return msg, nil
+	//Top rated movie list
+	case update.Message.Text == movieListTopRated:
+		msg = tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
+		msg.ReplyMarkup = createKeyboard(movieListTopRated, cancelButton)
+		err := actionPopularMovieList(&msg)
+		if err != nil {
+			return tgbotapi.MessageConfig{}, fmt.Errorf("top rated movie list error: %v", err)
 		}
 		return msg, nil
 	default:
@@ -112,9 +176,40 @@ func actionSearchMovie(update tgbotapi.Update, msg *tgbotapi.MessageConfig) erro
 	}
 
 	msg.Text = fmt.Sprintf(`Original title: %s
+Rating: %.2f
 Release date: %s
 Overview: %s`,
-		movie.Original_title, movie.Release_date, movie.Overview)
+		movie.Original_title, movie.Vote_average, movie.Release_date, movie.Overview)
+
+	//fmt.Println(msg.Text)
+	return nil
+}
+
+func actionSearchTV(update tgbotapi.Update, msg *tgbotapi.MessageConfig) error {
+	path := "/search/tv"
+	query := update.Message.Text
+
+	url, err := createURL(serverHost, path, query)
+	if err != nil {
+		return fmt.Errorf("create url error: %v", err)
+	}
+
+	// Make request to Server
+	body, err := makeRequestToServer(url)
+	if err != nil {
+		return err
+	}
+
+	var tv TV
+	if err = json.Unmarshal(body, &tv); err != nil {
+		return fmt.Errorf("parse body response error: %v", err)
+	}
+
+	msg.Text = fmt.Sprintf(`Original title: %s
+Rating: %.2f
+Release date: %s
+Overview: %s`,
+		tv.OriginalName, tv.VoteAverage, tv.FirstAirDate, tv.Overview)
 
 	//fmt.Println(msg.Text)
 	return nil
@@ -153,10 +248,83 @@ Known for: %s`,
 	return nil
 }
 
+func actionPopularMovieList(msg *tgbotapi.MessageConfig) error {
+	path := "/movie/popular"
+
+	url, err := createURL(serverHost, path, skipQuery)
+	if err != nil {
+		return fmt.Errorf("create url error: %v", err)
+	}
+
+	// Make request to Server
+	body, err := makeRequestToServer(url)
+	if err != nil {
+		return err
+	}
+
+	var popularMovies MoviesList
+	if err = json.Unmarshal(body, &popularMovies); err != nil {
+		return fmt.Errorf("parse body response error: %v", err)
+	}
+	msg.Text = `The most popular movies right now
+
+`
+	for i, movie := range popularMovies.Movies[:5] {
+		msg.Text += fmt.Sprintf(`Top %d
+Original title: %s
+Rating: %.2f
+Release date: %s
+Overview: %s
+
+`,
+			i+1, movie.Original_title, movie.Vote_average, movie.Release_date, movie.Overview)
+	}
+
+	return nil
+}
+
+func actionTopRatedMovieList(msg *tgbotapi.MessageConfig) error {
+	path := "/movie/top_rated"
+
+	url, err := createURL(serverHost, path, skipQuery)
+	if err != nil {
+		return fmt.Errorf("create url error: %v", err)
+	}
+
+	// Make request to Server
+	body, err := makeRequestToServer(url)
+	if err != nil {
+		return err
+	}
+
+	var popularMovies MoviesList
+	if err = json.Unmarshal(body, &popularMovies); err != nil {
+		return fmt.Errorf("parse body response error: %v", err)
+	}
+	msg.Text = `The most popular movies right now
+
+`
+	for i, movie := range popularMovies.Movies[:5] {
+		msg.Text += fmt.Sprintf(`Top %d
+Original title: %s
+Rating: %.2f
+Release date: %s
+Overview: %s
+
+`,
+			i+1, movie.Original_title, movie.Vote_average, movie.Release_date, movie.Overview)
+	}
+
+	return nil
+}
+
 func createURL(host, path, query string) (url.URL, error) {
 	// Create full url with query param
 	params := url.Values{}
-	params.Add("query", query)
+
+	if query != skipQuery {
+		params.Add("query", query)
+	}
 
 	baseURL, err := url.Parse(host)
 	if err != nil {
@@ -170,13 +338,14 @@ func createURL(host, path, query string) (url.URL, error) {
 
 func makeRequestToServer(url url.URL) ([]byte, error) {
 	response, err := http.Get(url.String())
+
 	if err != nil {
 		return nil, fmt.Errorf("request server error: %v", err)
 	}
 	defer response.Body.Close()
 
 	body, err := io.ReadAll(response.Body)
-
+	fmt.Println("     Body make request:", string(body))
 	if err != nil {
 		return nil, fmt.Errorf("read server response error: %v", err)
 	}
