@@ -11,6 +11,10 @@ type (
 		Vote_average      float64 `json:"vote_average,omitempty"`
 	}
 
+	MoviesList struct {
+		Movies []Movie
+	}
+
 	Person struct {
 		Adult              bool           `json:"adult,omitempty"`
 		Gender             int            `json:"gender,omitempty"`
@@ -21,6 +25,23 @@ type (
 		Popularity         float64        `json:"popularity,omitempty"`
 		ProfilePath        string         `json:"profile_path,omitempty"`
 		KnownFor           []KnownForItem `json:"known_for"`
+	}
+
+	TV struct {
+		Adult            bool     `json:"adult,omitempty"`
+		BackdropPath     string   `json:"backdrop_path,omitempty"`
+		GenreIDs         []int    `json:"genre_ids,omitempty"`
+		ID               int      `json:"id,omitempty"`
+		OriginCountry    []string `json:"origin_country,omitempty"`
+		OriginalLanguage string   `json:"original_language,omitempty"`
+		OriginalName     string   `json:"original_name"`
+		Overview         string   `json:"overview"`
+		Popularity       float64  `json:"popularity,omitempty"`
+		PosterPath       string   `json:"poster_path,omitempty"`
+		FirstAirDate     string   `json:"first_air_date,omitempty"`
+		Name             string   `json:"name,omitempty"`
+		VoteAverage      float64  `json:"vote_average,omitempty"`
+		VoteCount        int      `json:"vote_count,omitempty"`
 	}
 
 	KnownForItem struct {
