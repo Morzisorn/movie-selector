@@ -27,7 +27,7 @@ var (
 	movieListsButton  = "Movie lists"
 	movieListPopular  = "Popular"
 	movieListTopRated = "Top rated"
-	//movieListUpcoming = "Upcoming"
+	movieListUpcoming = "Upcoming"
 	tvListsButton     = "TV lists"
 	personListsButton = "Person lists"
 )
@@ -92,7 +92,7 @@ func handleUserAction(update tgbotapi.Update) (tgbotapi.MessageConfig, error) {
 	//Movie lists options
 	case update.Message.Text == movieListsButton:
 		msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Choose a movie list")
-		msg.ReplyMarkup = createKeyboard(movieListPopular, cancelButton)
+		msg.ReplyMarkup = createKeyboard(movieListPopular, movieListTopRated, movieListUpcoming, cancelButton)
 		return msg, nil
 	//Start of search movie flow
 	case update.Message.Text == searchMovieButton:
@@ -138,16 +138,25 @@ func handleUserAction(update tgbotapi.Update) (tgbotapi.MessageConfig, error) {
 		msg.ReplyMarkup = createKeyboard(movieListPopular, cancelButton)
 		err := actionPopularMovieList(&msg)
 		if err != nil {
-			return tgbotapi.MessageConfig{}, fmt.Errorf("popular movie list error: %v", err)
+			return tgbotapi.MessageConfig{}, fmt.Errorf("popular movies list error: %v", err)
 		}
 		return msg, nil
 	//Top rated movie list
 	case update.Message.Text == movieListTopRated:
 		msg = tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
 		msg.ReplyMarkup = createKeyboard(movieListTopRated, cancelButton)
-		err := actionPopularMovieList(&msg)
+		err := actionTopRatedMovieList(&msg)
 		if err != nil {
-			return tgbotapi.MessageConfig{}, fmt.Errorf("top rated movie list error: %v", err)
+			return tgbotapi.MessageConfig{}, fmt.Errorf("top rated movies list error: %v", err)
+		}
+		return msg, nil
+	//Upcoming movies list
+	case update.Message.Text == movieListUpcoming:
+		msg = tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
+		msg.ReplyMarkup = createKeyboard(movieListUpcoming, cancelButton)
+		err := actionUpcomingMovieList(&msg)
+		if err != nil {
+			return tgbotapi.MessageConfig{}, fmt.Errorf("upcoming movies list error: %v", err)
 		}
 		return msg, nil
 	default:
@@ -297,14 +306,49 @@ func actionTopRatedMovieList(msg *tgbotapi.MessageConfig) error {
 		return err
 	}
 
-	var popularMovies MoviesList
-	if err = json.Unmarshal(body, &popularMovies); err != nil {
+	var topRatedMovies MoviesList
+	if err = json.Unmarshal(body, &topRatedMovies); err != nil {
 		return fmt.Errorf("parse body response error: %v", err)
 	}
-	msg.Text = `The most popular movies right now
+	msg.Text = `Top rated movies
 
 `
-	for i, movie := range popularMovies.Movies[:5] {
+	for i, movie := range topRatedMovies.Movies[:5] {
+		msg.Text += fmt.Sprintf(`Top %d
+Original title: %s
+Rating: %.2f
+Release date: %s
+Overview: %s
+
+`,
+			i+1, movie.Original_title, movie.Vote_average, movie.Release_date, movie.Overview)
+	}
+
+	return nil
+}
+
+func actionUpcomingMovieList(msg *tgbotapi.MessageConfig) error {
+	path := "/movie/upcoming"
+
+	url, err := createURL(serverHost, path, skipQuery)
+	if err != nil {
+		return fmt.Errorf("create url error: %v", err)
+	}
+
+	// Make request to Server
+	body, err := makeRequestToServer(url)
+	if err != nil {
+		return err
+	}
+
+	var upcomingMovies MoviesList
+	if err = json.Unmarshal(body, &upcomingMovies); err != nil {
+		return fmt.Errorf("parse body response error: %v", err)
+	}
+	msg.Text = `Upcoming movies
+
+`
+	for i, movie := range upcomingMovies.Movies[:5] {
 		msg.Text += fmt.Sprintf(`Top %d
 Original title: %s
 Rating: %.2f

@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -16,18 +15,18 @@ var (
 func getEnvKeys() {
 	err := godotenv.Load()
 	if err != nil {
-		logrus.Fatal("Ошибка загрузки файла .env")
+		fmt.Println("Load .env error")
 	}
 
 	// Получаем API ключ из переменных окружения
 	Tmdb_api_key = os.Getenv("Tmdb_api_key")
 	if Tmdb_api_key == "" {
-		fmt.Println("API_KEY не установлен")
+		fmt.Println("API_KEY isn't set")
 	}
 
 	Tg_api_key = os.Getenv("Tg_api_key")
 	if Tmdb_api_key == "" {
-		fmt.Println("API_KEY не установлен")
+		fmt.Println("API_KEY isn't set")
 	}
 }
 

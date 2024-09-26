@@ -35,13 +35,18 @@ type (
 		PopularMovies() (string, error)
 	}
 
+	TopRatedMoviesSearcher interface {
+		TopRatedMovies() (string, error)
+	}
+
+	UpcomingMoviesSearcher interface {
+		UpcomingMovies() (string, error)
+	}
+
 	GetTgMoviesRequest struct {
 		MoviesRequest string
 	}
 
-	GetTMBDMoviesResponse struct {
-		Movies []Movie `json:"results"`
-	}
 	GetTMDBMovieList struct {
 		Movies []Movie `json:"results"`
 	}
@@ -90,6 +95,14 @@ func StartServer() {
 		return getTMDBPopularMovies(c, TMDBClient{})
 	})
 
+	app.Get("/movie/top_rated", func(c *fiber.Ctx) error {
+		return getTMDBTopRatedMovies(c, TMDBClient{})
+	})
+
+	app.Get("/movie/upcoming", func(c *fiber.Ctx) error {
+		return getTMDBUpcomingMovies(c, TMDBClient{})
+	})
+
 	logrus.Fatal(app.Listen(":3000"))
 }
 
@@ -104,7 +117,7 @@ func getTMDBMovies(c *fiber.Ctx, s MovieSearcher) error {
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString(fmt.Sprintf("Use SearchMovie error: %v", err))
 	}
-	var tmdbMovies GetTMBDMoviesResponse
+	var tmdbMovies GetTMDBMovieList
 
 	err = json.Unmarshal([]byte(tmdbMoviesResponse), &tmdbMovies)
 	if err != nil {
@@ -200,6 +213,55 @@ func getTMDBPopularMovies(c *fiber.Ctx, s PopularMoviesSearcher) error {
 	}
 	return c.JSON(resp)
 }
+func getTMDBTopRatedMovies(c *fiber.Ctx, s TopRatedMoviesSearcher) error {
+	tmdbMoviesResponse, err := s.TopRatedMovies()
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString(fmt.Sprintf("Use Top Rated Movies error: %v", err))
+	}
+	var tmdbMovies GetTMDBMovieList
+
+	err = json.Unmarshal([]byte(tmdbMoviesResponse), &tmdbMovies)
+	if err != nil {
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+
+	resp := MoviesList{}
+	for _, movie := range tmdbMovies.Movies {
+		m := Movie{
+			Original_title: movie.Original_title,
+			Release_date:   movie.Release_date,
+			Overview:       movie.Overview,
+			Vote_average:   movie.Vote_average,
+		}
+		resp.Movies = append(resp.Movies, m)
+	}
+	return c.JSON(resp)
+}
+
+func getTMDBUpcomingMovies(c *fiber.Ctx, s UpcomingMoviesSearcher) error {
+	tmdbMoviesResponse, err := s.UpcomingMovies()
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString(fmt.Sprintf("Use Upcoming Movies error: %v", err))
+	}
+	var tmdbMovies GetTMDBMovieList
+
+	err = json.Unmarshal([]byte(tmdbMoviesResponse), &tmdbMovies)
+	if err != nil {
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+
+	resp := MoviesList{}
+	for _, movie := range tmdbMovies.Movies {
+		m := Movie{
+			Original_title: movie.Original_title,
+			Release_date:   movie.Release_date,
+			Overview:       movie.Overview,
+			Vote_average:   movie.Vote_average,
+		}
+		resp.Movies = append(resp.Movies, m)
+	}
+	return c.JSON(resp)
+}
 
 func (t TMDBClient) SearchMovie(query string) (string, error) {
 	path := "/search/movie"
@@ -236,6 +298,28 @@ func (t TMDBClient) SearchTV(query string) (string, error) {
 
 func (t TMDBClient) PopularMovies() (string, error) {
 	path := "/movie/popular"
+
+	body, err := makeTMDBRequest(path, skipQuery)
+	if err != nil {
+		return "", err
+	}
+
+	return body, nil
+}
+
+func (t TMDBClient) TopRatedMovies() (string, error) {
+	path := "/movie/top_rated"
+
+	body, err := makeTMDBRequest(path, skipQuery)
+	if err != nil {
+		return "", err
+	}
+
+	return body, nil
+}
+
+func (t TMDBClient) UpcomingMovies() (string, error) {
+	path := "/movie/upcoming"
 
 	body, err := makeTMDBRequest(path, skipQuery)
 	if err != nil {
